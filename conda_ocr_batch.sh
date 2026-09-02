@@ -3,9 +3,6 @@
 # Define input directory
 INPUT_DIR=~/Code/Begutachtung
 
-# Activate safety: stop on error
-set -e
-
 # Load conda
 eval "$(conda shell.bash hook)"
 conda activate ocr_env
@@ -14,15 +11,17 @@ echo "📄 Starting OCR processing in $INPUT_DIR..."
 
 for input_file in "$INPUT_DIR"/*.pdf; do
     filename=$(basename "$input_file")
-    output_file="OCR_${filename}"
+    output_file="${filename%.pdf}_OCR.pdf"
 
     echo "🔍 Processing: $filename → $output_file"
 
-    docker run --rm -v "$INPUT_DIR":/home/documents -u $(id -u):$(id -g) \
+    if docker run --rm -v "$INPUT_DIR":/home/documents -u $(id -u):$(id -g) \
         jbarlow83/ocrmypdf \
-        -l deu "/home/documents/$filename" "/home/documents/$output_file"
-
-    echo "✅ Done: $output_file"
+        -l deu --force-ocr "/home/documents/$filename" "/home/documents/$output_file"; then
+        echo "✅ Done: $output_file"
+    else
+        echo "⚠️  Failed: $filename - skipping"
+    fi
 done
 
 echo "🎉 All files processed!"

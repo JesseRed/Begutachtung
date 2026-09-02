@@ -1,0 +1,10 @@
+# Fallakten / Patientendaten - niemals einchecken
+*.pdf
+
+# WSL-Metadaten von heruntergeladenen Dateien
+*:Zone.Identifier
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
