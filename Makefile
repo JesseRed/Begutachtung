@@ -1,4 +1,4 @@
-.PHONY: help tessdata image check clean-cache
+.PHONY: help tessdata lexicon image check test clean-cache
 
 TESSDATA_DIR := docker/tessdata
 BEST := https://github.com/tesseract-ocr/tessdata_best/raw/main
@@ -7,7 +7,9 @@ IMAGE := jbarlow83/ocrmypdf
 help:
 	@echo "make tessdata  - Tesseract-Sprachmodelle holen (~23 MB, einmalig)"
 	@echo "make image     - Docker-Image jbarlow83/ocrmypdf holen"
+	@echo "make lexicon   - Deutsche Wortliste aus tessdata erzeugen"
 	@echo "make check     - Voraussetzungen pruefen"
+	@echo "make test      - Testsuite"
 	@echo ""
 	@echo "OCR laufen lassen:  ./ocr_batch.sh <verzeichnis>"
 
@@ -21,6 +23,26 @@ $(TESSDATA_DIR)/%.traineddata:
 	@mkdir -p $(TESSDATA_DIR)
 	@echo "⬇️  $*.traineddata"
 	@curl -fsSL -o $@ "$(BEST)/$*.traineddata"
+
+# Die deutsche Wortliste steckt bereits als DAWG in tessdata_best. Sie hier
+# zurueckzuwandeln spart einen externen Download und liefert genau den
+# Wortschatz, den Tesseract selbst kennt.
+lexicon: config/lexicon/base.txt
+
+config/lexicon/base.txt: $(TESSDATA_DIR)/deu.traineddata $(TESSDATA_DIR)/eng.traineddata
+	@mkdir -p config/lexicon
+	@echo "Wortliste aus tessdata erzeugen..."
+	@docker run --rm -v "$(PWD)/$(TESSDATA_DIR):/td:ro" --entrypoint bash $(IMAGE) -c '\
+		cd /tmp; \
+		for l in deu eng; do \
+			combine_tessdata -u /td/$$l.traineddata $$l. >/dev/null 2>&1; \
+			dawg2wordlist $$l.lstm-unicharset $$l.lstm-word-dawg $$l.txt >/dev/null 2>&1; \
+		done; cat deu.txt eng.txt' \
+		| tr 'A-ZÄÖÜ' 'a-zäöü' | sort -u > $@
+	@echo "✅ $$(wc -l < $@) Wörter in $@"
+
+test:
+	python -m pytest -q
 
 image:
 	docker pull $(IMAGE)

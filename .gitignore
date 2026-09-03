@@ -23,3 +23,15 @@ __pycache__/
 *.py[cod]
 .venv/
 .pytest_cache/
+
+# Wörterliste wird aus tessdata erzeugt (make lexicon), 2,5 MB
+config/lexicon/*.txt
+
+# Lauf-Verzeichnisse und heruntergeladene Modelle
+runs/
+models/
+
+# Build-Artefakte
+*.egg-info/
+build/
+dist/
