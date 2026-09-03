@@ -4,50 +4,105 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Purpose
 
-A small toolbox of standalone scripts for preparing medical/legal case files ("Begutachtung") for review. The typical workflow is a manual pipeline, not an application:
+Tooling for preparing scanned medical/legal case files ("Begutachtung") for expert review. The
+workflow is a manual pipeline over PDFs, not an application:
 
-1. **OCR** a scanned case file (`Akte.pdf`) with `ocrmypdf` running in Docker, German language model.
-2. **Rotate** pages that were scanned upside down (`rotate_pdf.py`).
-3. **Extract** the relevant page ranges into individually named documents (`extractor.py`), driven by a CSV list.
+1. **OCR** a scanned case file (`Akte.pdf`) — `ocr_batch.sh`, using `ocrmypdf` in Docker.
+2. **Rotate** pages the scanner fed upside down — `rotate_pdf.py`.
+3. **Extract** the relevant page ranges into individually named documents — `extractor.py`,
+   driven by a CSV list.
 
-Each step is run by hand, on PDFs that sit loose in the repository root. There is no build, no test suite and no package — the scripts share no code and are not importable modules.
+Each step is run by hand. There is no build and no test suite yet.
 
-## Environment
+## Working corpus
 
-Conda environment `ocr_env` (Python 3.10, see `environment.yml`):
+The real case files are **not** in this repo. They live at
+`/mnt/c/Users/carst/Downloads/Gutachten_Eichelberger` — 40 case folders, ~1.3 GB, each with
+`Akte.pdf` (or `Akte01/02.pdf`), `Anschreiben.pdf`, `info.txt` and versioned `Gutachten_*.docx`.
+
+A typical `Akte.pdf` is **120–260 pages of pure scan with no text layer**. Assume this shape when
+reasoning about runtime and cost. These are real patient records — never commit them, never write
+their contents into the repo, and prefer aggregate metrics over dumping recognized text.
+
+## Setup
 
 ```bash
-conda env create -f environment.yml   # first time
-conda activate ocr_env
+make check       # what's missing
+make image       # docker pull jbarlow83/ocrmypdf
+make tessdata    # download tessdata_best deu+eng into docker/tessdata/ (~23 MB, gitignored)
+
+conda env create -f environment.yml && conda activate ocr_env
 ```
 
-`environment.yml` pins `pypdf==4.2.0`, but `rotate_pdf.py` imports `PyPDF2` — that dependency is missing from the environment file and must be installed separately (`pip install PyPDF2`), or the script ported to `pypdf`.
-
-OCR itself does not run in the conda environment; it runs in the `jbarlow83/ocrmypdf` Docker image, so a working Docker daemon is required.
+OCR runs entirely in Docker; the conda env only covers host-side PDF manipulation (`pypdf`,
+`pymupdf`). There is **no local tesseract or ocrmypdf** in WSL — every OCR call goes through the
+container.
 
 ## Commands
 
 ```bash
-# OCR every PDF in the input directory
-./conda_ocr_batch.sh      # activates ocr_env, --force-ocr, continues past failures
-./ocr_batch.sh            # no conda, set -e, aborts on first failure
+./ocr_batch.sh                      # OCR every PDF in the current directory
+./ocr_batch.sh ~/Akten/Fall_Mueller
+./ocr_batch.sh . --oversample 600   # extra args are passed through to ocrmypdf
 
-# Rotate pages (writes <name>_rotated.pdf next to the input)
-python rotate_pdf.py Akte.pdf even 180          # default: even pages, 180°
-python rotate_pdf.py Akte.pdf all 90
-python rotate_pdf.py Akte.pdf '[2,4,6]' '[90,180,270]'
+python rotate_pdf.py Akte.pdf              # default: even pages, 180°
+python rotate_pdf.py Akte.pdf odd 270
+python rotate_pdf.py Akte.pdf "[2,4,6]" "[90,180,270]"
 
-# Split out the page ranges listed in extract_list.csv
-python extractor.py
+python extractor.py                 # splits the ranges listed in extract_list.csv
 ```
 
-## Things to know before changing these scripts
+Env overrides for `ocr_batch.sh`: `OCR_JOBS` (default 8), `OCR_LANGS` (default `deu+eng`),
+`OCR_OVERSAMPLE` (default 400).
 
-- **`INPUT_DIR` is hardcoded** to `~/Code/Begutachtung` in both OCR scripts, and it is both the input and the output directory. Re-running an OCR script therefore also picks up the `*_OCR.pdf` files it produced on the previous run.
-- **The two OCR scripts differ in output naming** (`OCR_<name>.pdf` vs `<name>_OCR.pdf`) and in failure behaviour. `conda_ocr_batch.sh` is the newer one and the one normally used.
-- **`extractor.py` reads `extract_list.csv` from the current working directory** — the filename is hardcoded, not a CLI argument. `extract_list_example.csv` documents the format (`page_range,input_pdf,output_pdf`, 1-based inclusive ranges); `extract_list_old.csv` is a previous case's list kept for reference. Values are `.strip()`ped, so the whitespace after commas in the CSV is intentional-tolerant, not meaningful.
-- **`rotate_pdf.py` parses list arguments with `eval()`** and its angle-per-page index arithmetic for `even`/`odd`/`all` is easy to get off by one — check it when touching that branch.
+## Things to know before changing this
 
-## Data handling
+- **`--redo-ocr` and `--deskew` are mutually exclusive** in ocrmypdf — combining them aborts with a
+  pydantic validation error. `ocr_batch.sh` therefore picks a mode per file: files that already
+  carry a text layer get `--redo-ocr` (preserves crisp digital text), pure scans get `--force-ocr`
+  plus the full image preprocessing. Detection lives in `docker/detect_text.py` and runs *inside*
+  the container, because the host has no Python with a PDF text extractor.
+- **Do not set `TESSDATA_PREFIX` to a directory holding only `.traineddata` files.** It replaces
+  the image's tessdata directory wholesale, which loses `configs/` (`hocr`, `txt`, `tsv`) and makes
+  ocrmypdf fail with `Can't open hocr`. `ocr_batch.sh` instead bind-mounts the individual language
+  files over the image's own, discovering the path from `tesseract --list-langs`.
+- **`--clean` is safe, `--clean-final` and `--remove-background` are not.** On faxed medical forms
+  the latter two delete table rules and faint handwriting.
+- **`--jobs 8`, not 32.** RAM (15 GB) is the binding constraint, not the 32 cores.
+- **`extractor.py` reads `extract_list.csv` from the current working directory** — the filename is
+  hardcoded, not an argument. `extract_list_example.csv` documents the format
+  (`page_range,input_pdf,output_pdf`, 1-based inclusive); `extract_list_old.csv` is a previous
+  case's list kept for reference.
+- Any change to `ocr_batch.sh` output must keep the `OCR_<name>.pdf` **prefix** convention and the
+  page count identical, or `extractor.py`'s page ranges break.
 
-The PDFs processed here are real case files containing personal medical data. `.gitignore` excludes `*.pdf` (and the WSL `*:Zone.Identifier` sidecar files) for that reason — do not commit case documents or add exceptions to that rule. Note that `extract_list.csv` and `extract_list_old.csv` *are* tracked and their output filenames carry case details.
+## Measured baselines
+
+Numbers from 20 real pages sampled across two case files, comparing the old configuration
+(150 dpi, `tessdata_fast`, `-l deu`) with the current one (400 dpi, `tessdata_best`, `-l deu+eng`):
+
+| | old | current |
+|---|---|---|
+| Mean Tesseract word confidence | 75.3 % | **79.2 %** |
+| Words recognized | 3663 | **3908** (+6.7 %) |
+
+Better on 15 of 20 pages, worse on 2. Gains concentrate on the degraded pages (worst page:
+45.8 % → 60.2 %). Note this is Tesseract's *self-reported* confidence, not ground truth — a real
+CER measurement needs a gold set (planned, see below). One sampled page yields zero words in both
+configurations; such pages are radiology images or blanks and should eventually be classified and
+skipped rather than OCR'd.
+
+Handwriting is **not** addressed by any of this. Tesseract scores ~45 % on handwriting; filled-in
+forms and checkboxes need a vision model.
+
+## Where this is going
+
+The approved plan (`~/.claude/plans/ich-moechte-das-ocr-twinkling-rocket.md`) restructures this
+into a page-level adaptive cascade: Tesseract on every page, Claude vision only on pages Tesseract
+flags as uncertain, LLM adjudication only on disagreeing lines — with `--budget fast|balanced|best`
+and a cost cap. Two rules from that plan matter for any change made in the meantime:
+
+- **Never let a vision model be the sole source of a number.** Any span with digits, a dose/unit
+  pattern or a date where engines disagree gets flagged for human review, never auto-resolved.
+- **Never add a "send the whole page transcript to an LLM to clean up" pass.** It fabricates
+  plausible German medical prose, which is the worst possible failure mode here.

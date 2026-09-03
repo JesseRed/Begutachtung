@@ -1,6 +1,20 @@
 # Fallakten / Patientendaten - niemals einchecken
 *.pdf
 
+# OCR-Ergebnisse und Zwischenstaende (auch die .txt-Sidecars)
+OCR_*
+*_rotated.pdf
+*_OCR.pdf
+
+# Tesseract-Sprachmodelle (~23 MB, per `make tessdata` zu holen)
+docker/tessdata/*.traineddata
+
+# Referenzsatz fuer die Evaluation - enthaelt Patiententext
+eval/gold/
+
+# Zugangsdaten
+.env
+
 # WSL-Metadaten von heruntergeladenen Dateien
 *:Zone.Identifier
 
@@ -8,3 +22,4 @@
 __pycache__/
 *.py[cod]
 .venv/
+.pytest_cache/
