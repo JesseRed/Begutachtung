@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Läufe — Begutachtung{% endblock %}
+{% block content %}
+<div class="page-header"><h1 class="page-title">Läufe</h1></div>
+
+{% if not eintraege %}
+<p class="subtle">Noch keine Läufe.</p>
+{% else %}
+<div class="syslist">
+  {% for e in eintraege %}
+  <div class="sysrow" style="grid-template-columns: 1fr 130px 110px auto;">
+    <div>
+      <a href="/laeufe/{{ e.id }}">{{ e.name }}</a>
+      <div class="subtle mono">{{ e.id }}</div>
+    </div>
+    <div>
+      <span class="dot {% if e.status == 'running' %}dot-warn{% elif e.status == 'done' %}dot-ok{% else %}dot-off{% endif %}"></span>
+      {{ e.status_text }}
+    </div>
+    <div class="mono">{% if e.state.total %}{{ e.state.current }}/{{ e.state.total }}{% else %}—{% endif %}</div>
+    <div><a class="btn btn-secondary btn-sm" href="/laeufe/{{ e.id }}">Ansehen</a></div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

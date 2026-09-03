@@ -1,0 +1,59 @@
+{# Das Fragment rendert seinen eigenen Polling-Auslöser. Ist der Lauf fertig,
+   lässt es hx-trigger weg und das Polling hört von selbst auf - ohne JavaScript
+   und ohne Aufräumen. #}
+<div id="status"
+     hx-get="/laeufe/{{ run.id }}/status"
+     {% if status == "running" %}hx-trigger="every 2s"{% endif %}
+     hx-swap="outerHTML">
+
+  <div class="card" style="margin-bottom:1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <span class="dot {% if status == 'running' %}dot-warn{% elif status == 'done' %}dot-ok{% else %}dot-off{% endif %}"></span>
+        <strong>{{ status_text }}</strong>
+        {% if state.phase and status == "running" %}<span class="subtle"> · {{ state.phase }}</span>{% endif %}
+      </div>
+      <div class="subtle mono">
+        {{ "%.0f"|format(state.elapsed) }} s
+        {% if state.eta_seconds %} · noch ca. {{ "%.0f"|format(state.eta_seconds / 60) }} min{% endif %}
+      </div>
+    </div>
+
+    {% if state.total %}
+    <div class="balken"><div style="width: {{ state.percent }}%;"></div></div>
+    <div class="subtle">
+      Seite {{ state.current }} von {{ state.total }} ({{ state.percent }} %)
+      {% if state.counters.get("unsicher") %}
+        · <strong>{{ state.counters["unsicher"] }} unsicher</strong>
+      {% endif %}
+      {% if state.counters.get("aus_cache") %}
+        · {{ state.counters["aus_cache"] }} aus dem Zwischenspeicher
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if state.error %}
+    <div class="notice notice-error" style="margin-top:0.75rem;">{{ state.error }}</div>
+    {% endif %}
+
+    <div style="margin-top:1rem; display:flex; gap:0.5rem;">
+      {% if status == "running" %}
+      <form method="post" action="/laeufe/{{ run.id }}/abbrechen" style="display:inline;">
+        <button type="submit" class="btn btn-danger btn-sm">Abbrechen</button>
+      </form>
+      {% elif status == "done" and config.get("pdf") %}
+      <a class="btn btn-primary btn-sm" href="/pruefen?pdf={{ config['pdf'] }}">Jetzt prüfen</a>
+      {% endif %}
+      {% if quelle %}
+      <a class="btn btn-secondary btn-sm" href="/fall?pfad={{ quelle.parent }}">Zum Fall</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if ereignisse %}
+  <div class="section-label">Protokoll</div>
+  <div class="ereignisse">
+    {% for e in ereignisse %}<div>{{ e.msg }}</div>{% endfor %}
+  </div>
+  {% endif %}
+</div>

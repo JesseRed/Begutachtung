@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Lauf — Begutachtung{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ quelle.name if quelle else "Lauf" }}</h1>
+    <div class="subtle mono">{{ run.id }}</div>
+  </div>
+  <a href="/laeufe" class="btn btn-secondary btn-sm">Alle Läufe</a>
+</div>
+
+{% include "partials/lauf_status.html" %}
+{% endblock %}

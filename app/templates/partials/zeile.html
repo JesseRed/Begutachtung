@@ -1,0 +1,26 @@
+{# Eine Zeile der Prüfansicht. Klick macht daraus ein Eingabefeld; abgeschickt
+   wird per HTMX, zurück kommt dieses Fragment. #}
+<div class="zeile {{ z.klasse }}" id="zeile-{{ z.index }}">
+  <div>
+    {% if z.crop_w > 20 %}
+    <div class="ausschnitt" style="width:{{ z.crop_w }}px; height:{{ z.crop_h }}px;">
+      <img src="/bild/{{ digest }}/{{ seite }}"
+           style="margin-left:-{{ z.crop_x }}px; margin-top:-{{ z.crop_y }}px;"
+           loading="lazy" alt="">
+    </div>
+    {% endif %}
+    <form hx-post="/pruefen/korrektur" hx-target="#zeile-{{ z.index }}" hx-swap="outerHTML">
+      <input type="hidden" name="digest" value="{{ digest }}">
+      <input type="hidden" name="seite" value="{{ seite }}">
+      <input type="hidden" name="index" value="{{ z.index }}">
+      <input type="hidden" name="ocr" value="{{ z.ocr }}">
+      <input type="hidden" name="conf" value="{{ z.conf if z.conf is not none else '' }}">
+      <input type="text" name="text" value="{{ z.text }}"
+             style="background:transparent; border-color:transparent; padding:0.15rem 0;"
+             onfocus="this.style.background='var(--bg-input)'; this.style.borderColor='var(--accent)'; this.style.padding='0.35rem 0.5rem';">
+    </form>
+  </div>
+  <div class="zeile-konf">
+    {% if z.korrigiert %}korrigiert{% elif z.conf is not none %}{{ "%.2f"|format(z.conf) }}{% else %}—{% endif %}
+  </div>
+</div>

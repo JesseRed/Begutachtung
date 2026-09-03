@@ -14,10 +14,44 @@ make lexicon                     # deutsche Wortliste bauen  (einmalig, aus tess
 
 conda env create -f environment.yml
 conda activate ocr_env
-pip install -e .                 # stellt den Befehl `begutachtung` bereit
+pip install -e ".[ui]"           # Befehl `begutachtung` und das Dashboard
 ```
 
 Die OCR läuft komplett in Docker. Die conda-Umgebung wird nur für die PDF-Bearbeitung gebraucht.
+
+## Dashboard
+
+```bash
+make ui          # oder: begutachtung ui
+```
+
+Dann `http://127.0.0.1:8000` im Browser öffnen. Es bindet **nur an diesen
+Rechner** — hier liegen Patientendaten auf dem Bildschirm, im WLAN sichtbar zu
+sein wäre eine andere Risikoklasse.
+
+Vier Ansichten:
+
+- **Fälle** — Fallordner öffnen (Pfad eingeben oder aus der Liste wählen).
+- **Fall** — die PDFs des Ordners, je Datei Seitenzahl und Analysestand. Hier
+  wird ein Lauf gestartet oder ein durchsuchbares PDF erzeugt. Die
+  Engine-Matrix zeigt, welche Erkennung für welche Seitenart läuft; lokales
+  Bildmodell und Claude sind sichtbar, aber gesperrt, weil noch nicht gebaut.
+- **Lauf** — Fortschritt in Echtzeit, abbrechbar. Ein Browser-Refresh verliert
+  nichts, und ein Neustart des Servers hält den Lauf nicht an: er läuft als
+  eigener Prozess, den auch `begutachtung jobs` sieht.
+- **Prüfen** — das Herzstück. Seiten schlechteste zuerst, links das Seitenbild,
+  rechts die erkannten Zeilen mit ihrer Konfidenz. Eine Zeile anklicken,
+  korrigieren, Enter.
+
+### Korrigieren baut den Referenzsatz
+
+Jede Korrektur in der Prüfansicht wird nach `eval/gold/<digest>/lines.jsonl`
+geschrieben — mit erkannter Lesart, richtiger Lesart, Bildausschnitt und
+Konfidenz. Das ist genau das Material, mit dem sich später messen lässt, ob ein
+Handschriftmodell etwas taugt. Es entsteht bei der Durchsicht, die ohnehin
+anfällt; ein separater Nachmittag Tipparbeit entfällt.
+
+`eval/gold/` ist von git ausgeschlossen, weil es Patiententext enthält.
 
 ## Die zwei Wege
 
@@ -111,7 +145,8 @@ Zeichengenauigkeit. Ausgefüllte Formulare und Ankreuzfelder brauchen ein Bildsp
 ist der nächste Ausbauschritt, siehe unten.
 
 **Die Wortkonfidenz ist eine Selbsteinschätzung, kein Messwert.** Ein belastbarer Fehlerwert (CER)
-braucht einen von Hand korrigierten Referenzsatz. Der existiert noch nicht.
+braucht einen korrigierten Referenzsatz. Der wächst jetzt beim Prüfen mit — ausgewertet wird er
+noch nicht.
 
 **Die Seitenklassifikation kennt bisher nur `druck`, `degradiert`, `bild` und `leer`.** Formulare,
 Handschrift und Tabellen zu unterscheiden braucht Strukturanalyse mit OpenCV und kommt später;
@@ -119,15 +154,12 @@ bis dahin landen sie in `degradiert` und fallen über Konfidenz oder Lexikon auf
 
 ## Noch nicht gebaut
 
-**Das Dashboard gibt es noch nicht** — es lässt sich derzeit nicht starten. Geplant ist eine lokale
-Weboberfläche (`begutachtung ui` → `localhost:8000`, FastAPI + HTMX), in der vor jedem Lauf
-angeklickt wird, welche Seitenklasse an welche Engine geht, ob überhaupt Daten an ein
-Online-Modell gehen dürfen, und welche Ausgaben erzeugt werden. Kernstück ist eine Freigabeansicht,
-die vor dem ersten ausgehenden Aufruf anhält und die konkreten Seiten samt Vorschaubildern und
-geschätzten Kosten zeigt.
+**Es gibt bisher nur eine Erkennung: Tesseract.** Im Dashboard sind die Spalten für ein lokales
+Bildsprachmodell (Qwen3-VL über llama.cpp) und für Claude sichtbar, aber gesperrt. Solange verlässt
+kein Akteninhalt diesen Rechner.
 
-Ebenfalls offen: das lokale Bildsprachmodell (Qwen3-VL über llama.cpp), die Claude-Anbindung, das
-Zusammenführen mehrerer Lesarten und der Referenzsatz zur Messung.
+Ebenfalls offen: das Zusammenführen mehrerer Lesarten, die Freigabeansicht vor dem ersten
+ausgehenden Aufruf, und die Auswertung des Referenzsatzes (CER/WER).
 
 Der vollständige Plan mit Reihenfolge und Begründungen liegt unter
 `~/.claude/plans/ich-moechte-das-ocr-twinkling-rocket.md`.
@@ -144,6 +176,18 @@ einem lokalen Container, die Analyse in Python.
 ## Entwicklung
 
 ```bash
-make test            # pytest
+make test            # pytest (100 Tests)
 make check           # Voraussetzungen
+python run.py        # Dashboard mit automatischem Neuladen
 ```
+
+Läufe vom Terminal aus:
+
+```bash
+begutachtung jobs                    # laufende und vergangene Läufe
+begutachtung cancel <lauf-kennung>   # anhalten
+```
+
+Ein Lauf ist ein Verzeichnis unter `runs/` mit `state.json` und `events.jsonl`.
+Deshalb sehen Dashboard und Terminal dasselbe, und ein Lauf überlebt den
+Neustart des Servers.

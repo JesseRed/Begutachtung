@@ -60,8 +60,11 @@ begutachtung analyze Akte.pdf --lexicon config/lexicon/base.txt --pages 40-80
 begutachtung purge Akte.pdf         # drops the page-image cache for that file
 ```
 
-There is **no dashboard yet** — `begutachtung ui` does not exist. It is Phase 4 of the plan; do
-not document or reference it as though it works.
+```bash
+make ui                             # or: begutachtung ui  → http://127.0.0.1:8000
+begutachtung jobs                   # runs, same view the dashboard has
+begutachtung cancel <run-id>
+```
 
 Env overrides for `ocr_batch.sh`: `OCR_JOBS` (default 8), `OCR_LANGS` (default `deu+eng`),
 `OCR_OVERSAMPLE` (default 400).
@@ -105,6 +108,34 @@ Points worth knowing before changing it:
   that the hit rate sits at 80 % and flags correct words like *Berufsgenossenschaft* as garbage.
 - The cache lives at `~/.cache/begutachtung/<sha256[:12]>/` and holds page images from patient
   records. Writes are `.tmp` + `os.replace()` so an interrupted run leaves no half file.
+
+## The dashboard (`app/`)
+
+FastAPI + Jinja2 + HTMX, no build step, German UI — the shape is copied from `/home/ck/Code/
+TangoTrainer`. Four views: Fälle (pick a case folder), Fall (files + run options), Lauf (live
+progress), Prüfen (page image beside recognized lines, click to correct). Plus `/system`.
+
+- **A run is a directory, not a thread.** `app/services/runner.py` spawns the same CLI the user
+  could type (`start_new_session=True`), and the web app only ever *reads* `runs/<id>/state.json`.
+  This is deliberate: `run.py` uses `reload=True`, so a worker thread would die on every file save;
+  and a thread would mean the web app has a second, privileged path into the pipeline. State writes
+  are `.tmp` + `os.replace()`, so a poller never sees half a file.
+- **Polling stops by the server omitting the attribute.** `partials/lauf_status.html` renders its
+  own `hx-trigger="every 2s"` only while the run is `running`. No JavaScript, no cleanup.
+- **`TemplateResponse` uses the modern signature** `(request, "name.html", {...})`. TangoTrainer
+  uses the old `(name, {...})` order, which the installed Starlette rejects with
+  `TypeError: unhashable type: 'dict'`.
+- **Page images are never served via `StaticFiles`.** The cache holds patient records; a mount
+  would be a path-traversal read primitive. `app/routers/pruefen.py` validates the digest against
+  `^[0-9a-f]{12}$` and the page number against a range before touching the filesystem, and scales
+  images down (3306 px originals would be megabytes per page).
+- **Line crops are CSS, not files.** The full page image sits in a fixed-size `overflow:hidden`
+  div with negative margins from the bbox — no thousands of crop files, no extra dependency.
+- **Corrections in the review view build the gold set** (`src/begutachtung/gold.py` →
+  `eval/gold/<digest>/lines.jsonl`, gitignored). Appending, newest-wins on read. This is why the
+  eval harness will not need a separate afternoon of transcription.
+- `config.py` at the repo root shadows the `config/` directory — Python prefers the module over the
+  namespace package. It works, but don't add `config/__init__.py`.
 
 ## Measured baselines
 

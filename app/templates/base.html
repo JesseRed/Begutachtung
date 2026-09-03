@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Begutachtung{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://unpkg.com/htmx.org@2.0.3" integrity="sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq" crossorigin="anonymous"></script>
+</head>
+<body>
+  <nav>
+    <span class="nav-brand">Begutachtung</span>
+    <div class="nav-links">
+      <a href="/" {% if request.url.path == "/" or request.url.path.startswith("/fall") %}class="active"{% endif %}>Fälle</a>
+      <a href="/laeufe" {% if request.url.path.startswith("/laeufe") %}class="active"{% endif %}>Läufe</a>
+      <a href="/system" {% if request.url.path == "/system" %}class="active"{% endif %}>System</a>
+    </div>
+  </nav>
+
+  <div class="container {% block container_class %}{% endblock %}">
+    {% block content %}{% endblock %}
+  </div>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

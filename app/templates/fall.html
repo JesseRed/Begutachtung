@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}{{ ordner.name }} — Begutachtung{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ ordner.name }}</h1>
+    <div class="subtle mono">{{ ordner }}</div>
+  </div>
+  <a href="/" class="btn btn-secondary btn-sm">Anderer Fall</a>
+</div>
+
+{% if not dateien %}
+<p class="subtle">Keine PDFs in diesem Ordner (Ergebnisse mit <code>OCR_</code>-Präfix
+   werden ausgeblendet).</p>
+{% else %}
+
+<div class="datei-grid" style="margin-bottom:2rem;">
+  {% for d in dateien %}
+  <div class="datei-card">
+    <div class="datei-name">{{ d.name }}</div>
+    <div class="datei-meta">
+      {{ d.pages }} Seiten ·
+      {% if d.has_text_layer %}Textlayer vorhanden{% else %}reiner Scan{% endif %}
+      {% if d.analysiert %}
+        <br>{{ d.analysiert }} Seiten analysiert{% if not d.vollstaendig %} ({{ d.fortschritt }} %){% endif %}
+      {% endif %}
+      {% if d.ocr_pdf %}<br><span style="color:var(--ok);">OCR-PDF vorhanden</span>{% endif %}
+    </div>
+    <div class="datei-actions">
+      <form method="post" action="/fall/analysieren" style="display:inline;">
+        <input type="hidden" name="pfad" value="{{ ordner }}">
+        <input type="hidden" name="pdf" value="{{ d.path }}">
+        <input type="hidden" name="dpi" value="400">
+        <input type="hidden" name="lexikon" value="1">
+        <button type="submit" class="btn btn-primary btn-sm">
+          {% if d.analysiert %}Erneut analysieren{% else %}Analysieren{% endif %}
+        </button>
+      </form>
+      {% if d.analysiert %}
+      <a class="btn btn-secondary btn-sm" href="/pruefen?pdf={{ d.path }}">Prüfen</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card" style="margin-bottom:1.5rem;">
+  <div class="section-label">Welche Engine für welche Seitenart</div>
+  <table class="matrix">
+    <tr>
+      <th>Seitenart</th>
+      <th style="text-align:center;">Tesseract</th>
+      <th style="text-align:center;" class="spalte-gesperrt">Lokales Bildmodell</th>
+      <th style="text-align:center;" class="spalte-gesperrt">Claude</th>
+    </tr>
+    {% for art in ["sauberer Druck", "degradiert (Fax/Kopie)", "Formular / Handschrift", "Tabelle"] %}
+    <tr>
+      <td>{{ art }}</td>
+      <td class="zelle"><span class="fest" title="liefert die Wortboxen für den Textlayer">✓ fest</span></td>
+      <td class="zelle spalte-gesperrt"><span class="gesperrt" title="noch nicht gebaut">– – –</span></td>
+      <td class="zelle spalte-gesperrt"><span class="gesperrt" title="noch nicht gebaut">– – –</span></td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="subtle" style="margin-top:0.75rem;">
+    Tesseract ist nicht abwählbar, weil es die Wortboxen für den Textlayer liefert.
+    Bildmodell und Claude sind noch nicht gebaut — Stand siehe <a href="/system">System</a>.
+    Solange verlässt kein Akteninhalt diesen Rechner.
+  </p>
+</div>
+
+<div class="card">
+  <div class="section-label">Durchsuchbare PDFs</div>
+  <p class="subtle" style="margin-bottom:0.75rem;">
+    Erzeugt <code>OCR_&lt;name&gt;.pdf</code> für alle PDFs des Ordners über <code>ocr_batch.sh</code>.
+  </p>
+  <form method="post" action="/fall/ocr">
+    <input type="hidden" name="pfad" value="{{ ordner }}">
+    <button type="submit" class="btn btn-secondary">Durchsuchbare PDFs erzeugen</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

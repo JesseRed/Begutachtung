@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}System — Begutachtung{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">System</h1>
+  <a href="/system?neu=1" class="btn btn-secondary btn-sm">Neu prüfen</a>
+</div>
+
+<div class="syslist" style="margin-bottom:2rem;">
+  {% for c in capabilities %}
+  <div class="sysrow">
+    <div>
+      <span class="dot {% if c.ok %}dot-ok{% elif c.planned %}dot-off{% else %}dot-warn{% endif %}"></span>
+      {{ c.label }}
+    </div>
+    <div class="{% if c.planned %}subtle{% endif %}">{{ c.detail }}</div>
+    <div class="hint">{% if c.hint %}{{ c.hint }}{% endif %}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <div class="section-label">Zwischenspeicher</div>
+  <p class="subtle" style="margin-bottom:0.75rem;">
+    {{ "%.0f"|format(cache_mb) }} MB Seitenbilder und Erkennungsergebnisse.
+    Er enthält Seiten aus Patientenakten.
+  </p>
+  <form method="post" action="/system/cache/leeren"
+        onsubmit="return confirm('Zwischenspeicher wirklich löschen? Analysen laufen danach neu.')">
+    <button type="submit" class="btn btn-danger btn-sm">Leeren</button>
+  </form>
+</div>
+{% endblock %}

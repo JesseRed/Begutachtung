@@ -21,8 +21,13 @@ from .confidence import PageClass, Thresholds, assess, load_lexicon
 from .engines.base import Line, PageResult, Word
 from .engines.tesseract import TesseractEngine
 from .pdfio import inspect, rasterize_page
+from .runstate import CANCELLED, DONE, RUNNING, RunDir, RunState
 
 ProgressFn = Callable[[int, int, int], None]
+
+
+class Cancelled(RuntimeError):
+    """Der Lauf wurde von aussen angehalten - kein Fehler, ein Wunsch."""
 
 
 def analyze_document(
@@ -34,6 +39,7 @@ def analyze_document(
     lexicon_path: Path | None = None,
     thresholds: Thresholds | None = None,
     on_progress: ProgressFn | None = None,
+    run: RunDir | None = None,
 ) -> dict:
     pdf_path = Path(pdf_path)
     info = inspect(pdf_path)
@@ -52,7 +58,24 @@ def analyze_document(
     started = time.monotonic()
     rows: list[dict] = []
 
+    state = RunState(id=run.id, kind="analyze", source=str(pdf_path),
+                     total=len(wanted), phase="Rastern und Lesen") if run else None
+    if run and state:
+        run.write_pid()
+        run.write_state(state)
+        run.append_event(f"{len(wanted)} Seiten aus {pdf_path.name}")
+
     for n, page_no in enumerate(wanted, start=1):
+        # Abbruch wird zwischen Seiten geprueft, nicht mittendrin: eine
+        # angefangene Seite fertig zu rechnen kostet Sekunden und haelt den
+        # Zwischenspeicher konsistent.
+        if run and run.cancel_requested:
+            if state:
+                state.status = CANCELLED
+                run.write_state(state)
+                run.append_event(f"Abgebrochen nach {n - 1} von {len(wanted)} Seiten")
+            raise Cancelled(f"nach {n - 1} von {len(wanted)} Seiten")
+
         if on_progress:
             on_progress(n, len(wanted), page_no)
 
@@ -81,9 +104,28 @@ def analyze_document(
             "cached": bool(cached),
         })
 
+        if run and state:
+            state.current = n
+            state.counters = {
+                "unsicher": sum(1 for r in rows if r["escalate"]),
+                "aus_cache": sum(1 for r in rows if r["cached"]),
+            }
+            run.write_state(state)
+            if a.escalate:
+                run.append_event(f"Seite {page_no} unsicher: {a.reason_text}",
+                                 page=page_no, escalate=True)
+
     by_class: dict[str, int] = {}
     for row in rows:
         by_class[row["page_class"]] = by_class.get(row["page_class"], 0) + 1
+
+    if run and state:
+        state.status = DONE
+        state.current = len(rows)
+        state.phase = "fertig"
+        run.write_state(state)
+        run.append_event(
+            f"Fertig: {state.counters.get('unsicher', 0)} von {len(rows)} Seiten unsicher")
 
     return {
         "source": str(pdf_path),

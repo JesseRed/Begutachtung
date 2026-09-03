@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Prüfen: {{ pdf.name }} — Begutachtung{% endblock %}
+{% block container_class %}container-wide{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ pdf.name }} · Seite {{ seite }}</h1>
+    <div class="subtle">
+      {{ seiten_gesamt }} Seiten · {{ unsicher_gesamt }} unsicher ·
+      <strong>{{ korrigiert_gesamt }} Zeilen korrigiert</strong>
+      {% if info.get("page_class") %} · Seitenart {{ info["page_class"] }}{% endif %}
+      {% if info.get("mean_conf") is not none %} · Konfidenz {{ "%.2f"|format(info["mean_conf"]) }}{% endif %}
+    </div>
+  </div>
+  <a href="/fall?pfad={{ pdf.parent }}" class="btn btn-secondary btn-sm">Zum Fall</a>
+</div>
+
+<div class="card" style="margin-bottom:1.25rem; padding:0.75rem 1rem;">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
+    <div class="subtle">
+      Schlechteste Seite zuerst — Position {{ position }} von {{ reihenfolge|length }}
+    </div>
+    <div style="display:flex; gap:0.4rem;">
+      {% set idx = reihenfolge.index(seite) if seite in reihenfolge else 0 %}
+      {% if idx > 0 %}
+      <a class="btn btn-secondary btn-sm" href="/pruefen?pdf={{ pdf }}&seite={{ reihenfolge[idx-1] }}">← Sicherer</a>
+      {% endif %}
+      {% if idx < reihenfolge|length - 1 %}
+      <a class="btn btn-primary btn-sm" href="/pruefen?pdf={{ pdf }}&seite={{ reihenfolge[idx+1] }}">Nächste unsichere →</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="pruef-layout">
+  <div class="seitenbild">
+    <img src="/bild/{{ digest }}/{{ seite }}?w={{ bildbreite }}" alt="Seite {{ seite }}">
+  </div>
+  <div>
+    <div class="section-label">Erkannte Zeilen — anklicken zum Korrigieren</div>
+    <div class="zeilen">
+      {% for z in zeilen %}{% include "partials/zeile.html" %}{% else %}
+      <p class="subtle">Auf dieser Seite wurde kein Text erkannt.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

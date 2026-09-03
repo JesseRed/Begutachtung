@@ -1,4 +1,4 @@
-.PHONY: help tessdata lexicon image check test clean-cache
+.PHONY: help tessdata lexicon image check test ui clean-cache
 
 TESSDATA_DIR := docker/tessdata
 BEST := https://github.com/tesseract-ocr/tessdata_best/raw/main
@@ -10,11 +10,11 @@ help:
 	@echo "make lexicon   - Deutsche Wortliste aus tessdata erzeugen"
 	@echo "make check     - Voraussetzungen pruefen"
 	@echo "make test      - Testsuite"
+	@echo "make ui        - Dashboard starten (http://127.0.0.1:8000)"
 	@echo ""
 	@echo "Durchsuchbare PDFs:  ./ocr_batch.sh <verzeichnis>"
 	@echo "Seiten bewerten:     begutachtung analyze <datei.pdf>"
-	@echo ""
-	@echo "Ein Dashboard gibt es noch nicht - siehe README, Abschnitt \"Noch nicht gebaut\"."
+	@echo "Dashboard:           make ui"
 
 # tessdata_best ist genauer als die im Image mitgelieferte schnelle Variante.
 # Nur deu und eng werden gebraucht: die Dateien werden einzeln in das tessdata-
@@ -46,6 +46,9 @@ config/lexicon/base.txt: $(TESSDATA_DIR)/deu.traineddata $(TESSDATA_DIR)/eng.tra
 
 test:
 	python -m pytest -q
+
+ui:
+	python run.py
 
 image:
 	docker pull $(IMAGE)

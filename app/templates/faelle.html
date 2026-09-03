@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Fälle — Begutachtung{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Fall öffnen</h1>
+</div>
+
+{% if error %}
+<div class="notice notice-error">{{ error }}</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:1.5rem;">
+  <div class="section-label">Ordner öffnen</div>
+  <form method="post" action="/oeffnen" class="inline-form">
+    <div class="form-group" style="flex:1; min-width:340px;">
+      <label>Pfad zum Fallordner</label>
+      <input type="text" name="pfad" required style="width:100%;"
+             value="{{ form_pfad or '' }}"
+             placeholder="{{ sammelordner }}/2501_Koch_Ralf_POCO">
+    </div>
+    <button type="submit" class="btn btn-primary">Öffnen</button>
+  </form>
+</div>
+
+{% if zuletzt %}
+<div class="section-label">Zuletzt geöffnet</div>
+<div class="datei-grid" style="margin-bottom:1.5rem;">
+  {% for p in zuletzt %}
+  <a class="datei-card" href="/fall?pfad={{ p }}" style="text-decoration:none; color:inherit;">
+    <div class="datei-name">{{ p.rsplit('/', 1)[-1] }}</div>
+    <div class="datei-meta mono">{{ p }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if vorschlaege %}
+<div class="section-label">Fälle in {{ sammelordner }}</div>
+<div class="datei-grid">
+  {% for d in vorschlaege %}
+  <a class="datei-card" href="/fall?pfad={{ d }}" style="text-decoration:none; color:inherit;">
+    <div class="datei-name">{{ d.name }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p class="subtle">Der Sammelordner <code>{{ sammelordner }}</code> ist nicht erreichbar.
+   Pfad oben von Hand eingeben.</p>
+{% endif %}
+{% endblock %}
