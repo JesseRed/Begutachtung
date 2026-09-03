@@ -11,7 +11,10 @@ help:
 	@echo "make check     - Voraussetzungen pruefen"
 	@echo "make test      - Testsuite"
 	@echo ""
-	@echo "OCR laufen lassen:  ./ocr_batch.sh <verzeichnis>"
+	@echo "Durchsuchbare PDFs:  ./ocr_batch.sh <verzeichnis>"
+	@echo "Seiten bewerten:     begutachtung analyze <datei.pdf>"
+	@echo ""
+	@echo "Ein Dashboard gibt es noch nicht - siehe README, Abschnitt \"Noch nicht gebaut\"."
 
 # tessdata_best ist genauer als die im Image mitgelieferte schnelle Variante.
 # Nur deu und eng werden gebraucht: die Dateien werden einzeln in das tessdata-

@@ -50,7 +50,15 @@ python rotate_pdf.py Akte.pdf odd 270
 python rotate_pdf.py Akte.pdf "[2,4,6]" "[90,180,270]"
 
 python extractor.py                 # splits the ranges listed in extract_list.csv
+
+# Page-level analysis (the `begutachtung` package; needs `pip install -e .`)
+begutachtung inspect Akte.pdf
+begutachtung analyze Akte.pdf --lexicon config/lexicon/base.txt --pages 40-80
+begutachtung purge Akte.pdf         # drops the page-image cache for that file
 ```
+
+There is **no dashboard yet** — `begutachtung ui` does not exist. It is Phase 4 of the plan; do
+not document or reference it as though it works.
 
 Env overrides for `ocr_batch.sh`: `OCR_JOBS` (default 8), `OCR_LANGS` (default `deu+eng`),
 `OCR_OVERSAMPLE` (default 400).
@@ -75,6 +83,25 @@ Env overrides for `ocr_batch.sh`: `OCR_JOBS` (default 8), `OCR_LANGS` (default `
   case's list kept for reference.
 - Any change to `ocr_batch.sh` output must keep the `OCR_<name>.pdf` **prefix** convention and the
   page count identical, or `extractor.py`'s page ranges break.
+
+## The package (`src/begutachtung/`)
+
+Stage 1 of the planned cascade: rasterize (PyMuPDF) → Tesseract via Docker → classify → assess.
+Points worth knowing before changing it:
+
+- **Tesseract is driven with TSV output, not hOCR or `--sidecar`.** TSV gives word boxes *and* word
+  confidences with far less parsing. Lines are keyed by `(block_num, par_num, line_num)` — `line_num`
+  alone repeats across paragraphs, so grouping by it merges unrelated lines.
+- **`EngineInfo.is_local` is the only place the local/cloud distinction is encoded.** The approval
+  gate and audit log will key off it. Never write `if engine == "claude"` anywhere.
+- **`EngineInfo.provides_geometry` is true only for Tesseract.** Vision models produce good text but
+  unreliable coordinates; reconciliation must use a geometry-providing engine as the skeleton so
+  invented boxes can never reach the PDF text layer.
+- **The lexicon is generated, not vendored.** `make lexicon` converts the DAWG inside
+  `tessdata_best` back into a word list (237k entries). German compounds are decomposed — without
+  that the hit rate sits at 80 % and flags correct words like *Berufsgenossenschaft* as garbage.
+- The cache lives at `~/.cache/begutachtung/<sha256[:12]>/` and holds page images from patient
+  records. Writes are `.tmp` + `os.replace()` so an interrupted run leaves no half file.
 
 ## Measured baselines
 
