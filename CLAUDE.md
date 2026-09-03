@@ -12,7 +12,8 @@ workflow is a manual pipeline over PDFs, not an application:
 3. **Extract** the relevant page ranges into individually named documents — `extractor.py`,
    driven by a CSV list.
 
-Each step is run by hand. There is no build and no test suite yet.
+Steps 1-3 are run by hand. A `begutachtung` Python package (`src/`) adds page-level analysis on
+top; `make test` runs its suite (40 tests, no Docker needed).
 
 ## Working corpus
 
@@ -30,8 +31,10 @@ their contents into the repo, and prefer aggregate metrics over dumping recogniz
 make check       # what's missing
 make image       # docker pull jbarlow83/ocrmypdf
 make tessdata    # download tessdata_best deu+eng into docker/tessdata/ (~23 MB, gitignored)
+make lexicon     # regenerate config/lexicon/base.txt from tessdata (gitignored)
 
 conda env create -f environment.yml && conda activate ocr_env
+pip install -e . # provides the `begutachtung` command
 ```
 
 OCR runs entirely in Docker; the conda env only covers host-side PDF manipulation (`pypdf`,
